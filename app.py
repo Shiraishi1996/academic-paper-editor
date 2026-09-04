@@ -150,6 +150,7 @@ DEFAULT_PAPER = {
     "authors": "",
     "affiliations": "",
     "abstract": "",
+    "keywords": "",
     "bib_data": "",
     "format_preset": "generic",
     "translation_provider": "online",
@@ -209,6 +210,7 @@ def normalize_paper_structure(data):
     data.setdefault("authors", "")
     data.setdefault("affiliations", "")
     data.setdefault("abstract", "")
+    data.setdefault("keywords", "")
     data.setdefault("bib_data", "")
     data.setdefault("format_preset", "generic")
     data.setdefault("translation_provider", "online")
@@ -1215,6 +1217,7 @@ def translate_paper_data(paper,target,skip_references=True,provider=None,glossar
     result["translation_provider"]=provider; result["translation_model"]=local_model; result["translation_glossary"]=glossary_text or ""
     if result.get("title"): result["title"]=translate_text_value(result["title"],target,provider,glossary_text,local_model)
     if result.get("abstract"): result["abstract"]=translate_text_value(result["abstract"],target,provider,glossary_text,local_model)
+    if result.get("keywords"): result["keywords"]=translate_text_value(result["keywords"],target,provider,glossary_text,local_model)
     if result.get("affiliations"): result["affiliations"]=translate_text_value(result["affiliations"],target,provider,glossary_text,local_model)
     ref_re=re.compile(r"^(references|bibliography|参考文献|引用文献)\s*$",re.I)
     for sec in result.get("sections",[]):
@@ -2103,23 +2106,103 @@ def _block_fallback_text(block):
     return re.sub(r"<[^>]+>", "", (block or {}).get("html", "")).strip()
 
 
+_SUBMISSION_BOILERPLATE_RE = re.compile(
+    r"^(?:"
+    r"翻訳(?:しました|済み|結果)|抽出(?:しました|済み|結果)|解析(?:しました|済み|結果)|"
+    r"以下(?:は|が).*(?:翻訳|抽出|解析).*(?:です|である)?|"
+    r"translation\s*(?:complete|result)|translated\s*(?:text|version)|"
+    r"extracted\s*(?:text|content)|extraction\s*(?:complete|result)|"
+    r"the\s+following\s+is\s+(?:a\s+)?(?:translation|extracted\s+text)"
+    r")[\s:：。.!-]*$", re.I
+)
+
+
+def sanitize_submission_paper(paper):
+    """Return a clean manuscript copy with UI/provenance boilerplate removed from export."""
+    clean = normalize_paper_structure(deepcopy(paper or {}))
+    # Operational metadata must never appear in a submission artifact.
+    clean.pop("translation_provider", None)
+    clean.pop("translation_model", None)
+    clean.pop("translation_glossary", None)
+    for sec in clean.get("sections", []):
+        kept = []
+        for blk in sec.get("blocks", []):
+            if blk.get("type") in {"image", "equation", "table"}:
+                kept.append(blk)
+                continue
+            text = (blk.get("plain_text") or re.sub(r"<[^>]+>", "", blk.get("html", ""))).strip()
+            if not text:
+                kept.append(blk)
+                continue
+            if text.startswith("--- Page") or text.startswith("--- Sheet"):
+                continue
+            if _SUBMISSION_BOILERPLATE_RE.match(text):
+                continue
+            kept.append(blk)
+        sec["blocks"] = kept
+        sync_section_content(sec)
+    return clean
+
+
+def _keywords_list(value):
+    return [x.strip() for x in re.split(r"[,;、，]", value or "") if x.strip()]
+
+
 def latex_preamble_for_preset(paper):
     key = paper.get('format_preset', 'generic')
     p = PUBLISHER_PRESETS.get(key, PUBLISHER_PRESETS['generic'])
-    cls, opts = p['latex_class'], p['latex_options']
-    lines = [f"\\documentclass[{opts}]{{{cls}}}", "\\usepackage{graphicx}", "\\usepackage{amsmath,amssymb}", "\\usepackage{booktabs}"]
-    if key == 'springer_nature':
-        lines.append('% Springer Nature: sn-jnl.cls is supplied by the official journal template package.')
-    elif key in {'wiley', 'taylor_francis', 'mdpi'}:
-        lines.append('% General publisher preset. Replace with the target journal-specific class/template when required.')
-    lines += [f"\\title{{{latex_escape_text(paper.get('title',''))}}}", f"\\author{{{latex_escape_text(paper.get('authors',''))}}}", "\\date{}", "", "\\begin{document}", "\\maketitle"]
-    if paper.get('abstract'):
-        lines += ["\\begin{abstract}", latex_escape_text(paper.get('abstract','')), "\\end{abstract}", ""]
+    title = latex_escape_text(paper.get('title',''))
+    authors = latex_escape_text(paper.get('authors',''))
+    affiliations = latex_escape_text(paper.get('affiliations',''))
+    abstract = latex_escape_text(paper.get('abstract',''))
+    keywords = ', '.join(latex_escape_text(k) for k in _keywords_list(paper.get('keywords','')))
+
+    if key == 'ieee':
+        lines = [r"\documentclass[journal]{IEEEtran}", r"\usepackage{graphicx}", r"\usepackage{amsmath,amssymb}", r"\usepackage{booktabs}",
+                 f"\\title{{{title}}}", f"\\author{{{authors}}}", r"\begin{document}", r"\maketitle"]
+        if abstract:
+            lines += [r"\begin{abstract}", abstract, r"\end{abstract}"]
+        if keywords:
+            lines += [r"\begin{IEEEkeywords}", keywords, r"\end{IEEEkeywords}"]
+    elif key == 'elsevier':
+        lines = [r"\documentclass[preprint,12pt]{elsarticle}", r"\usepackage{graphicx}", r"\usepackage{amsmath,amssymb}", r"\usepackage{booktabs}",
+                 r"\begin{document}", r"\begin{frontmatter}", f"\\title{{{title}}}", f"\\author{{{authors}}}"]
+        if affiliations:
+            lines += [f"\\address{{{affiliations}}}"]
+        if abstract:
+            lines += [r"\begin{abstract}", abstract, r"\end{abstract}"]
+        if keywords:
+            lines += [r"\begin{keyword}", keywords, r"\end{keyword}"]
+        lines += [r"\end{frontmatter}"]
+    elif key == 'springer_nature':
+        lines = [r"\documentclass[pdflatex,sn-basic]{sn-jnl}", r"\usepackage{graphicx}", r"\usepackage{amsmath,amssymb}", r"\usepackage{booktabs}",
+                 f"\\title[Article Title]{{{title}}}", f"\\author*{{{authors}}}"]
+        if affiliations:
+            lines += [f"\\affil{{{affiliations}}}"]
+        if abstract:
+            lines += [f"\\abstract{{{abstract}}}"]
+        if keywords:
+            lines += [f"\\keywords{{{keywords}}}"]
+        lines += [r"\begin{document}", r"\maketitle"]
+    else:
+        cls, opts = p['latex_class'], p['latex_options']
+        lines = [f"\\documentclass[{opts}]{{{cls}}}", r"\usepackage{graphicx}", r"\usepackage{amsmath,amssymb}", r"\usepackage{booktabs}",
+                 f"\\title{{{title}}}", f"\\author{{{authors}}}", r"\date{}", r"\begin{document}", r"\maketitle"]
+        if abstract:
+            lines += [r"\begin{abstract}", abstract, r"\end{abstract}"]
+        if keywords:
+            lines += [r"\paragraph{Keywords} " + keywords]
     return '\n'.join(lines) + '\n'
 
-@app.route("/api/export/<format_type>", methods=["GET"])
+@app.route("/api/export/<format_type>", methods=["GET", "POST"])
 def export_paper(format_type):
-    paper = load_paper()
+    if request.method == "POST":
+        payload = _json_payload()
+        paper = payload.get("paper") if isinstance(payload, dict) else None
+        paper = paper or load_paper()
+    else:
+        paper = load_paper()
+    paper = sanitize_submission_paper(paper)
     preset_key = paper.get('format_preset', 'generic')
     preset = PUBLISHER_PRESETS.get(preset_key, PUBLISHER_PRESETS['generic'])
 
@@ -2149,11 +2232,8 @@ def export_paper(format_type):
                 path = safe_upload_path(src)
                 if path:
                     zf.write(path, arcname=f"images/{os.path.basename(path)}")
-            zf.writestr("FORMAT_NOTE.txt", (
-                f"Preset: {preset['label']}\n"
-                "This is a publisher-level authoring preset. Final submission requirements may differ by journal. "
-                "Use the target journal's official Instructions for Authors/template as the final authority.\n"
-            ))
+            if (paper.get('bib_data') or '').strip():
+                zf.writestr("references.bib", paper.get('bib_data',''))
         out.seek(0)
         return send_file(out, as_attachment=True, download_name=f"paper_{preset_key}_latex.zip", mimetype="application/zip")
 
@@ -2174,6 +2254,11 @@ def export_paper(format_type):
             else:
                 doc.add_heading('Abstract', level=1)
                 doc.add_paragraph(paper.get('abstract', ''))
+        if paper.get('keywords'):
+            p = doc.add_paragraph()
+            label = 'Index Terms—' if preset_key == 'ieee' else 'Keywords: '
+            p.add_run(label).bold = True
+            p.add_run(', '.join(_keywords_list(paper.get('keywords', ''))))
 
         content_section = doc.sections[0]
         if preset.get('columns', 1) > 1:
