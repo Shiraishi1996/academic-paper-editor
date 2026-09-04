@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+snapshots/
+uploads/
+data/
+workspaces/
+smoke_test.py
+download_translation_models.py
