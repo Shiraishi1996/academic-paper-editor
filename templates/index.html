@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Academic Paper Editor v18</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js"></script>
+    <script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+<header>
+    <h1>📝 <span data-i18n="app_name">論文エディタ</span> <span class="badge">v18</span></h1>
+    <div class="header-actions desktop-actions">
+        <span id="saveStatus" class="save-status" data-i18n="saved">保存済み</span>
+        <button class="btn btn-secondary btn-sm" onclick="newProject()">＋ <span data-i18n="new_project">新規作成</span></button>
+        <button class="btn btn-primary btn-sm" onclick="saveProject()">💾 <span data-i18n="save_project">プロジェクト保存</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="chooseProjectFile()">📂 <span data-i18n="open_project">プロジェクトを開く</span></button>
+        <input type="file" id="projectOpenInput" accept=".zip,.paperproj,.paperproj.zip" style="display:none" onchange="openProjectFile(this)">
+        <select id="uiLanguage" class="preset-select" onchange="setUILanguage(this.value)" aria-label="UI language">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+        </select>
+        <select id="publisherPreset" onchange="changePublisherPreset()" class="preset-select" data-i18n-title="publisher_preset">
+            <option value="generic" data-i18n="generic">汎用</option>
+            <option value="ieee">IEEE</option>
+            <option value="elsevier">Elsevier</option>
+            <option value="springer_nature">Springer Nature</option>
+            <option value="mdpi">MDPI</option>
+            <option value="wiley">Wiley</option>
+            <option value="taylor_francis">Taylor & Francis</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="openModal('snapshotModal')">📸 <span data-i18n="backup">バックアップ</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="openRestoreModal()">📜 <span data-i18n="restore">復元</span></button>
+        <select id="exportSelect" onchange="handleExport(this)" class="export-select">
+            <option value="" data-i18n="export_format">出力形式...</option>
+            <option value="docx" data-i18n="export_docx">Word・画像・数式埋込 (.docx)</option>
+            <option value="pdf_print" data-i18n="export_pdf">PDF印刷表示</option>
+            <option value="latex">LaTeX (.tex)</option>
+            <option value="latex_zip" data-i18n="export_latex_zip">LaTeX + 画像 (.zip)</option>
+            <option value="images_zip" data-i18n="export_images_zip">画像のみ一括 (.zip)</option>
+        </select>
+    </div>
+    <button class="mobile-menu-toggle" type="button" onclick="toggleMobileActions()" aria-label="Menu">☰</button>
+</header>
+
+<div id="mobileActionSheet" class="mobile-action-sheet">
+    <div class="mobile-sheet-grip"></div>
+    <div class="mobile-sheet-grid">
+        <button class="btn btn-secondary" onclick="newProject(); toggleMobileActions(false)">＋ <span data-i18n="new_project">新規作成</span></button>
+        <button class="btn btn-primary" onclick="saveProject(); toggleMobileActions(false)">💾 <span data-i18n="save_project">プロジェクト保存</span></button>
+        <button class="btn btn-secondary" onclick="chooseProjectFile(); toggleMobileActions(false)">📂 <span data-i18n="open_project">プロジェクトを開く</span></button>
+        <button class="btn btn-secondary" onclick="openModal('snapshotModal'); toggleMobileActions(false)">📸 <span data-i18n="backup">バックアップ</span></button>
+    </div>
+    <label class="mobile-sheet-label">Language / 言語</label>
+    <div class="mobile-language-row">
+        <button class="btn btn-secondary" onclick="setUILanguage('ja')">日本語</button>
+        <button class="btn btn-secondary" onclick="setUILanguage('en')">English</button>
+    </div>
+    <label class="mobile-sheet-label" data-i18n="publisher_preset">出版社書式プリセット</label>
+    <select id="mobilePublisherPreset" class="mobile-full-select" onchange="changePublisherPreset(true,this.value)">
+        <option value="generic" data-i18n="generic">汎用</option><option value="ieee">IEEE</option><option value="elsevier">Elsevier</option><option value="springer_nature">Springer Nature</option><option value="mdpi">MDPI</option><option value="wiley">Wiley</option><option value="taylor_francis">Taylor &amp; Francis</option>
+    </select>
+    <label class="mobile-sheet-label" data-i18n="export_format">出力形式...</label>
+    <select class="mobile-full-select" onchange="handleExport(this); this.value=''">
+        <option value="" data-i18n="export_format">出力形式...</option>
+        <option value="docx" data-i18n="export_docx">Word・画像・数式埋込 (.docx)</option>
+        <option value="pdf_print" data-i18n="export_pdf">PDF印刷表示</option>
+        <option value="latex">LaTeX (.tex)</option>
+        <option value="latex_zip" data-i18n="export_latex_zip">LaTeX + 画像 (.zip)</option>
+        <option value="images_zip" data-i18n="export_images_zip">画像のみ一括 (.zip)</option>
+    </select>
+    <button class="btn btn-secondary mobile-close-sheet" onclick="toggleMobileActions(false)" data-i18n="close">閉じる</button>
+</div>
+<div id="mobileSheetBackdrop" class="mobile-sheet-backdrop" onclick="toggleMobileActions(false)"></div>
+
+<div class="mobile-nav">
+    <button id="nav-sidebar" onclick="switchMainPanel('sidebar-panel')" class="active" data-i18n="structure_assets">構成 / 素材</button>
+    <button id="nav-editor" onclick="switchMainPanel('editor-panel')" data-i18n="edit">編集</button>
+    <button id="nav-preview" onclick="switchMainPanel('preview-panel')" data-i18n="preview">プレビュー</button>
+</div>
+
+<div class="app-container">
+    <div id="welcomeScreen" class="welcome-overlay">
+        <div class="welcome-box">
+            <h2 data-i18n="start_writing">論文の執筆を始める</h2>
+            <p class="muted" data-i18n="start_desc">既存原稿をアップロードすると、タイトル・段落・画像・Word数式を構造化して読み込みます。</p>
+            <div class="upload-dropzone">
+                <p class="drop-title">📁 <span data-i18n="initial_upload">ここにファイルをドロップして読み込む</span></p>
+                <p class="drop-desc" data-i18n="supported_desc">Word (.docx), PDF, テキスト等に対応。アップロードしたファイル名は論文タイトルには使用しません。</p>
+                <input type="file" onchange="handleInitialImport(this)">
+            </div>
+            <div id="welcomeStatus" class="status-success"></div>
+            <div class="welcome-actions">
+                <button class="btn btn-primary" onclick="newProject(false)">＋ <span data-i18n="new_project">新規作成</span></button>
+                <button class="btn btn-secondary" onclick="chooseProjectFile()">📂 <span data-i18n="open_project">プロジェクトを開く</span></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel sidebar-panel active-panel" id="sidebar-panel">
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchSidebarTab('outline')" data-i18n="outline">構成</button>
+            <button class="tab-btn" onclick="switchSidebarTab('assets')" data-i18n="assets">素材</button>
+            <button class="tab-btn" onclick="switchSidebarTab('bib')" data-i18n="references">文献</button>
+        </div>
+        <div id="outlineTab" class="tab-content">
+            <div class="tab-title-row">
+                <span class="tab-title" data-i18n="section_paragraphs">セクション / 段落</span>
+                <button class="btn btn-primary btn-sm" onclick="addSection()">+ <span data-i18n="add">追加</span></button>
+            </div>
+            <div id="sectionList"></div>
+        </div>
+        <div id="assetsTab" class="tab-content" style="display:none;">
+            <div class="upload-card">
+                <span class="upload-card-title" data-i18n="upload_material">資料を解析して追加</span>
+                <div class="upload-dropzone material-dropzone">
+                    <p class="drop-title">📁 <span data-i18n="material_drop">ここに資料をドロップして追加</span></p>
+                    <p class="drop-desc" data-i18n="material_supported">Wordは段落・画像・表・数式まで解析して現在位置へ挿入します。</p>
+                    <input type="file" id="fileInput" onchange="uploadAsset()">
+                </div>
+                <div id="uploadStatus" class="status-success small"></div>
+            </div>
+            <div class="hint" data-i18n="drag_hint">💡 画像や資料を選び、現在位置へ挿入できます。</div>
+            <div id="assetList"></div>
+        </div>
+        <div id="bibTab" class="tab-content" style="display:none;">
+            <p class="hint" data-i18n="bibtex_data">BibTeXデータ</p>
+            <textarea id="bibInput" rows="10" class="bib-input" oninput="updateBibData()"></textarea>
+            <div id="citeKeyBadges" class="cite-badges"></div>
+        </div>
+    </div>
+
+    <div class="panel editor-panel" id="editor-panel">
+        <div class="panel-header"><span data-i18n="manuscript_editor">原稿編集</span></div>
+        <div class="editor-form">
+            <input type="text" id="paperTitle" data-i18n-placeholder="paper_title" placeholder="論文タイトル" oninput="triggerAutoSave()">
+            <div class="two-col-fields">
+                <input type="text" id="paperAuthors" data-i18n-placeholder="authors" placeholder="著者名" oninput="triggerAutoSave()">
+                <input type="text" id="paperAffiliations" data-i18n-placeholder="affiliations" placeholder="所属" oninput="triggerAutoSave()">
+            </div>
+            <textarea id="paperAbstract" rows="3" data-i18n-placeholder="abstract" placeholder="概要 (Abstract)" oninput="triggerAutoSave()"></textarea>
+            <div class="preset-note" data-i18n="academic_style_on">日本語本文は常体・である調に自動整形</div>
+
+            <div class="translation-bar">
+                <span class="translation-title">🌐 <span data-i18n="translation">翻訳</span></span>
+                <span class="online-translation-badge" data-i18n="translation_online_free">オンライン翻訳（APIキー不要）</span>
+                <select id="translateTarget" class="preset-select">
+                    <option value="en" data-i18n="to_english">英語へ</option>
+                    <option value="ja" data-i18n="to_japanese">日本語へ</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="translateCurrentBlock()" data-i18n="translate_paragraph">選択段落を翻訳</button>
+                <button class="btn btn-primary btn-sm" onclick="translateWholePaper()" data-i18n="translate_all">全文を翻訳</button>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="toggleTranslationGlossary()" data-i18n="glossary">用語辞書</button>
+                <span id="translateStatus" class="translate-status"></span>
+            </div>
+            <div id="translationGlossaryPanel" class="translation-options" style="display:none;">
+                <div class="translation-help" data-i18n="translation_online_help">APIキー不要のオンライン翻訳を使用します。翻訳時には対象テキストがオンライン翻訳サービスへ送信されます。サービス側の混雑や制限により一時的に失敗する場合があります。</div>
+                <label for="translationGlossary" data-i18n="glossary_label">学術用語辞書（1行に「日本語 = English」）</label>
+                <textarea id="translationGlossary" rows="5" data-i18n-placeholder="glossary_placeholder" placeholder="例: 可変浮力 = variable buoyancy" oninput="updateTranslationSettings()"></textarea>
+                <div class="translation-help" data-i18n="glossary_help">数式、引用番号、DOI/URL、Figure/Table/Equation番号は翻訳時に保護されます。</div>
+            </div>
+
+            <hr class="separator">
+            <div class="editor-body">
+                <input type="text" id="currentSectionTitle" data-i18n-placeholder="section_heading_optional" placeholder="セクション見出し（不要なら空欄）" class="section-title-input" oninput="updateCurrentSectionTitle()">
+                <div class="block-toolbar">
+                    <span id="currentBlockMeta" class="block-meta"></span>
+                    <button class="btn btn-primary btn-sm" type="button" onclick="addParagraph(true)">＋ <span data-i18n="next_paragraph">次に段落</span></button>
+                </div>
+                <div class="paragraph-help" data-i18n="editor_help">左の構成欄から段落・画像・数式を個別に選択できます。数式はWord OMMLを保持します。</div>
+                <div id="presetNote" class="preset-note"></div>
+                <textarea id="currentSectionContent" data-i18n-placeholder="paragraph_text" placeholder="段落テキスト..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel preview-panel" id="preview-panel">
+        <div class="panel-header"><span data-i18n="live_preview">リアルタイムプレビュー</span></div>
+        <div class="paper-preview-wrapper">
+            <div class="paper-sheet" id="previewSheet">
+                <div class="preview-title" id="prevTitle"></div>
+                <div class="preview-authors" id="prevAuthors"></div>
+                <div class="preview-affiliations" id="prevAffiliations"></div>
+                <div class="preview-abstract" id="prevAbstractBox">
+                    <h4>Abstract</h4><div id="prevAbstract"></div>
+                </div>
+                <div id="prevSections"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="snapshotModal">
+    <div class="modal-content">
+        <h3 data-i18n="manual_backup">手動バックアップ</h3>
+        <input type="text" id="snapshotNote" data-i18n-placeholder="backup_note" placeholder="メモ..." class="modal-input">
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('snapshotModal')" data-i18n="cancel">キャンセル</button>
+            <button class="btn btn-primary" onclick="submitSnapshot()" data-i18n="save">保存</button>
+        </div>
+    </div>
+</div>
+<div class="modal" id="restoreModal">
+    <div class="modal-content">
+        <h3 data-i18n="restore_history">履歴から復元</h3>
+        <div id="snapshotList" class="snapshot-list"></div>
+        <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('restoreModal')" data-i18n="close">閉じる</button></div>
+    </div>
+</div>
+<script src="/static/js/main.js"></script>
+</body>
+</html>
