@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>{{ paper.title }}</title>
+<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};</script><script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+body{font-family:"Times New Roman",Times,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6;color:#111827;}
+h1{text-align:center;font-size:1.8rem;margin-bottom:10px;}.authors{text-align:center;font-size:1rem;color:#374151;}.affiliations{text-align:center;font-size:0.88rem;color:#6b7280;font-style:italic;margin-bottom:30px;}
+.abstract{background-color:#f9fafb;border-left:4px solid #4b5563;padding:15px 20px;margin-bottom:30px;font-size:0.95rem;}
+h2{font-size:1.25rem;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin-top:25px;}
+img{max-width:100%;height:auto;display:block;margin:15px auto;} table{width:100%;border-collapse:collapse;} td,th{border:1px solid #bbb;padding:4px;} .equation-table td,.equation-table th{border:none!important;} .equation-table td:first-child{text-align:center;width:90%;}.equation-table td:last-child{text-align:right;white-space:nowrap;}
+body.preset-ieee{max-width:8.5in;font-size:10pt;line-height:1.2;} body.preset-ieee h1{font-size:18pt;font-weight:400;} body.preset-ieee .abstract{background:none;border:0;padding:0;font-size:9pt;} body.preset-ieee #content-area{column-count:2;column-gap:0.25in;} body.preset-ieee h2{font-size:10pt;text-align:center;text-transform:uppercase;border:0;break-after:avoid;} body.preset-ieee img,body.preset-ieee table{break-inside:avoid;}
+body.preset-elsevier{font-size:11pt;line-height:1.45;} body.preset-springer_nature{font-size:10.5pt;line-height:1.45;} body.preset-mdpi{font-size:10.5pt;line-height:1.45;} body.preset-wiley{font-size:11pt;line-height:1.5;} body.preset-taylor_francis{font-size:12pt;line-height:1.6;}
+@media print{body{margin:0;padding:0;}}
+</style></head><body class="preset-{{ preset or paper.format_preset or 'generic' }}">
+<h1>{{ paper.title }}</h1><div class="authors">{{ paper.authors }}</div><div class="affiliations">{{ paper.affiliations }}</div>
+{% if paper.abstract %}<div class="abstract"><strong>Abstract:</strong><br>{{ paper.abstract }}</div>{% endif %}
+<div id="content-area"></div>
+<script>
+const sections={{ paper.sections|tojson }};const contentArea=document.getElementById('content-area');sections.forEach(sec=>{const h2=document.createElement('h2');h2.innerText=sec.title;contentArea.appendChild(h2);(sec.blocks||[]).forEach(blk=>{const d=document.createElement('div');d.innerHTML=blk.html||'';contentArea.appendChild(d);});});
+{% if auto_print %} window.onload=function(){setTimeout(function(){window.print();},1500)}; {% endif %}
+</script></body></html>
