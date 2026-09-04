@@ -8,7 +8,7 @@ const I18N = {
         initial_upload:"ここにファイルをドロップして読み込む", supported_desc:"Word (.docx), PDF, テキスト等に対応。アップロードしたファイル名は論文タイトルには使用しません。",
         start_blank:"空から始める", outline:"構成", assets:"素材", references:"文献", section_paragraphs:"セクション / 段落", add:"追加",
         upload_material:"資料を解析して追加", upload:"解析して挿入", material_drop:"ここに資料をドロップして追加", material_supported:"Wordは段落・画像・表・数式まで解析して現在位置へ挿入します。PDF・テキスト・画像にも対応します。", drag_hint:"💡 初回アップロードと同じ解析器を使用します。Word数式と埋込画像も保持します。", bibtex_data:"BibTeXデータ",
-        manuscript_editor:"原稿編集", paper_title:"論文タイトル", authors:"著者名", affiliations:"所属", abstract:"概要 (Abstract)", translation:"翻訳", academic_style_on:"日本語本文は常体・である調に自動整形",
+        manuscript_editor:"原稿編集", paper_title:"論文タイトル", authors:"著者名", affiliations:"所属", abstract:"概要 (Abstract)", keywords:"キーワード（カンマ区切り）", translation:"翻訳", academic_style_on:"日本語本文は常体・である調に自動整形",
         to_english:"英語へ", to_japanese:"日本語へ", translate_paragraph:"選択段落を翻訳", translate_all:"全文を翻訳",
         translation_local:"ローカル（API不要）", translation_online:"オンライン（任意）", translation_online_free:"オンライン翻訳（APIキー不要）", translation_online_help:"APIキー不要のオンライン翻訳を使用します。翻訳時には対象テキストがオンライン翻訳サービスへ送信されます。サービス側の混雑や制限により一時的に失敗する場合があります。", translation_model:"ローカルモデル", model_fugumt:"FuguMT（日英専用・推奨）", model_m2m100:"M2M100 418M（大容量）", model_opus:"OPUS-MT（軽量・旧方式）", glossary:"用語辞書", glossary_label:"学術用語辞書（1行に「日本語 = English」）", glossary_placeholder:"例: 可変浮力 = variable buoyancy", glossary_help:"数式、引用番号、DOI/URL、Figure/Table/Equation番号は翻訳時に保護されます。", translation_local_help:"既定は日英専用FuguMTです。品質をさらに比較したい場合はM2M100を選べます。初回のみモデルを取得し、その後はオフライン利用できます。", local_model_loading:"ローカル翻訳モデルを読み込み中（初回はモデル取得を含みます）...",
         section_heading_optional:"セクション見出し（不要なら空欄）", next_paragraph:"次に段落", editor_help:"左の構成欄から段落・画像・数式を個別に選択できます。数式はWord OMMLを保持します。",
@@ -30,7 +30,7 @@ const I18N = {
         initial_upload:"Drop a file here to import", supported_desc:"Supports Word (.docx), PDF, and text. The uploaded filename is never used as the manuscript title.",
         start_blank:"Start blank", outline:"Outline", assets:"Assets", references:"References", section_paragraphs:"Sections / Paragraphs", add:"Add",
         upload_material:"Parse and add material", upload:"Parse & insert", material_drop:"Drop material here to add", material_supported:"Word files are parsed into paragraphs, images, tables, and equations and inserted at the current position. PDF, text, and images are also supported.", drag_hint:"💡 Uses the same parser as the initial import. Embedded images and Word equations are preserved.", bibtex_data:"BibTeX data",
-        manuscript_editor:"Manuscript Editor", paper_title:"Paper title", authors:"Authors", affiliations:"Affiliations", abstract:"Abstract", translation:"Translation", academic_style_on:"Japanese manuscript text is normalized to academic plain style",
+        manuscript_editor:"Manuscript Editor", paper_title:"Paper title", authors:"Authors", affiliations:"Affiliations", abstract:"Abstract", keywords:"Keywords (comma-separated)", translation:"Translation", academic_style_on:"Japanese manuscript text is normalized to academic plain style",
         to_english:"To English", to_japanese:"To Japanese", translate_paragraph:"Translate selected paragraph", translate_all:"Translate whole paper",
         translation_local:"Local (no API)", translation_online:"Online (optional)", translation_online_free:"Online translation (no API key)", translation_online_help:"Uses online translation without an API key. Text selected for translation is sent to the online translation service. Temporary failures can occur if the service is busy or rate-limited.", translation_model:"Local model", model_fugumt:"FuguMT (Japanese/English, recommended)", model_m2m100:"M2M100 418M (large)", model_opus:"OPUS-MT (lightweight legacy)", glossary:"Glossary", glossary_label:"Academic glossary (one `Japanese = English` pair per line)", glossary_placeholder:"Example: 可変浮力 = variable buoyancy", glossary_help:"Equations, citation numbers, DOI/URLs, and Figure/Table/Equation numbers are protected during translation.", translation_local_help:"FuguMT is the default Japanese/English-specific model. M2M100 is available for comparison. Models download only on first use and then run offline from cache.", local_model_loading:"Loading local translation model (first use may download model files)...",
         section_heading_optional:"Section heading (leave blank if unnecessary)", next_paragraph:"Next paragraph", editor_help:"Select paragraphs, images, and equations individually from the outline. Word OMML equations are preserved.",
@@ -184,7 +184,7 @@ async function openProjectFile(inputEl) {
     }
 }
 
-let paperData = { title: "", authors: "", affiliations: "", abstract: "", bib_data: "", format_preset: "generic", translation_provider: "online", translation_model: "", translation_glossary: "", sections: [] };
+let paperData = { title: "", authors: "", affiliations: "", abstract: "", keywords: "", bib_data: "", format_preset: "generic", translation_provider: "online", translation_model: "", translation_glossary: "", sections: [] };
 let activeSectionIndex = 0;
 let activeBlockIndex = 0;
 let autoSaveTimer = null;
@@ -228,6 +228,7 @@ function normalizeClientData(data) {
     data.authors = data.authors || "";
     data.affiliations = data.affiliations || "";
     data.abstract = data.abstract || "";
+    data.keywords = data.keywords || "";
     data.bib_data = data.bib_data || "";
     data.format_preset = data.format_preset || "generic";
     data.translation_provider = "online";
@@ -359,6 +360,7 @@ function loadPaperData() {
         document.getElementById("paperAuthors").value = paperData.authors;
         document.getElementById("paperAffiliations").value = paperData.affiliations;
         document.getElementById("paperAbstract").value = paperData.abstract;
+        if(document.getElementById("paperKeywords")) document.getElementById("paperKeywords").value = paperData.keywords || "";
         document.getElementById("bibInput").value = paperData.bib_data;
         const presetSel = document.getElementById("publisherPreset");
         if (presetSel) presetSel.value = paperData.format_preset || "generic";
@@ -389,6 +391,7 @@ function handleInitialImport(inputEl) {
             document.getElementById("paperAuthors").value = paperData.authors || "";
             document.getElementById("paperAffiliations").value = paperData.affiliations || "";
             document.getElementById("paperAbstract").value = paperData.abstract || "";
+    if(document.getElementById("paperKeywords")) document.getElementById("paperKeywords").value = paperData.keywords || "";
     const tg=document.getElementById("translationGlossary"); if(tg) tg.value=paperData.translation_glossary || "";
             activeSectionIndex = 0;
             activeBlockIndex = 0;
@@ -641,6 +644,7 @@ function triggerAutoSave() {
     paperData.authors = document.getElementById("paperAuthors")?.value || "";
     paperData.affiliations = document.getElementById("paperAffiliations")?.value || "";
     paperData.abstract = document.getElementById("paperAbstract")?.value || "";
+    paperData.keywords = document.getElementById("paperKeywords")?.value || "";
     paperData.translation_provider = "online";
     paperData.translation_model = "";
     paperData.translation_glossary = document.getElementById("translationGlossary")?.value || "";
@@ -939,6 +943,7 @@ function syncFormToPaper() {
     paperData.authors = document.getElementById("paperAuthors")?.value || "";
     paperData.affiliations = document.getElementById("paperAffiliations")?.value || "";
     paperData.abstract = document.getElementById("paperAbstract")?.value || "";
+    paperData.keywords = document.getElementById("paperKeywords")?.value || "";
     paperData.translation_provider = "online";
     paperData.translation_model = "";
     paperData.translation_glossary = document.getElementById("translationGlossary")?.value || "";
@@ -950,6 +955,7 @@ function applyPaperToForm() {
     document.getElementById("paperAuthors").value = paperData.authors || "";
     document.getElementById("paperAffiliations").value = paperData.affiliations || "";
     document.getElementById("paperAbstract").value = paperData.abstract || "";
+    if(document.getElementById("paperKeywords")) document.getElementById("paperKeywords").value = paperData.keywords || "";
     const tg=document.getElementById("translationGlossary"); if(tg) tg.value=paperData.translation_glossary || "";
     const preset=document.getElementById("publisherPreset"); if(preset) preset.value=paperData.format_preset || "generic";
     renderSectionList(); loadActiveBlockToEditor(); renderPreview();
@@ -1054,9 +1060,38 @@ function restoreSnapshot(fname) {
         alert(t("restored"));
     });
 }
-function handleExport(sel) {
+async function handleExport(sel) {
     const val = sel.value;
     if (!val) return;
-    window.open(`/api/export/${val}`, "_blank");
-    sel.value = "";
+    sel.disabled = true;
+    try {
+        syncFormToPaper();
+        paperData.sections.forEach(syncSectionContent);
+        const r = await fetch(`/api/export/${val}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paper: paperData })
+        });
+        if (!r.ok) throw new Error(await apiErrorMessage(r, "Export failed"));
+        const blob = await r.blob();
+        const cd = r.headers.get("Content-Disposition") || "";
+        const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+        let filename = m ? decodeURIComponent(m[1].replace(/"/g, "")) : `paper_${paperData.format_preset || "generic"}.${val === "pdf_print" ? "html" : val}`;
+        const url = URL.createObjectURL(blob);
+        if (val === "pdf_print" || val === "html") {
+            const win = window.open(url, "_blank");
+            if (!win) window.location.href = url;
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } else {
+            const a = document.createElement("a");
+            a.href = url; a.download = filename; a.style.display = "none";
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+    } catch (e) {
+        alert((uiLanguage === "ja" ? "エクスポートに失敗しました: " : "Export failed: ") + e.message);
+    } finally {
+        sel.disabled = false;
+        sel.value = "";
+    }
 }
